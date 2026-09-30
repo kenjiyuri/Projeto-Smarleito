@@ -20,7 +20,7 @@ API_URL = "http://localhost:8000/api/v1"
 
 st.set_page_config(
     page_title="SMARTLEITO — Fácil de usar",
-    page_icon="🏥",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -312,17 +312,17 @@ def gerar_historico():
 # Menu lateral — poucos itens, nomes simples e com emoji grande
 # ---------------------------------------------------------------------------
 with st.sidebar:
-    st.markdown("## 🏥 SMARTLEITO")
+    st.markdown("##  SMARTLEITO")
     st.markdown("### Menu")
     pagina = st.radio(
         "Escolha uma página",
         [
-            "🏠 Início",
-            "👀 Ver leitos",
-            "📊 Números",
-            "🔮 Quando o paciente vai embora?",
-            "❓ O que é isso?",
-            "👥 Quem fez",
+            " Início",
+            " Ver leitos",
+            " Números",
+            " Quando o paciente vai embora?",
+            " O que é isso?",
+            " Quem fez",
         ],
         label_visibility="collapsed",
     )
@@ -330,8 +330,8 @@ with st.sidebar:
     st.markdown(
         """
         <p style="font-size:1rem; color:#b8e0f0;">
-        💡 Dica: use os botões grandes.<br>
-        🔠 Letras grandes para ler fácil.<br>
+         Dica: use os botões grandes.<br>
+         Letras grandes para ler fácil.<br>
         🟢 Verde = livre · 🔴 Vermelho = ocupado
         </p>
         """,
@@ -343,8 +343,8 @@ with st.sidebar:
 # ===========================================================================
 
 # ----- INÍCIO -----
-if pagina == "🏠 Início":
-    st.markdown('<p class="hero-title">🏥 SMARTLEITO</p>', unsafe_allow_html=True)
+if pagina == "Início":
+    st.markdown('<p class="hero-title"> SMARTLEITO</p>', unsafe_allow_html=True)
     st.markdown(
         '<p class="hero-sub">Ajuda o hospital a cuidar dos leitos.<br>'
         "Fácil de ver. Fácil de entender.</p>",
@@ -367,7 +367,7 @@ if pagina == "🏠 Início":
         st.markdown(
             """
             <div class="metric-box">
-                <div class="value">📊</div>
+                <div class="value"></div>
                 <div class="label">Ver os números<br>do hospital</div>
             </div>
             """,
@@ -377,7 +377,7 @@ if pagina == "🏠 Início":
         st.markdown(
             """
             <div class="metric-box">
-                <div class="value">🔮</div>
+                <div class="value"></div>
                 <div class="label">Saber quando o<br>paciente pode ir embora</div>
             </div>
             """,
@@ -388,7 +388,7 @@ if pagina == "🏠 Início":
     st.markdown(
         """
         <div class="card">
-            <h3>📌 Como usar</h3>
+            <h3> Como usar</h3>
             <p>
             1. No menu à esquerda, toque na página que você quer.<br>
             2. Os botões são grandes — é só clicar.<br>
@@ -401,8 +401,8 @@ if pagina == "🏠 Início":
     )
 
 # ----- VER LEITOS (mapa simples) -----
-elif pagina == "👀 Ver leitos":
-    st.markdown("## 👀 Ver leitos")
+elif pagina == " Ver leitos":
+    st.markdown("##  Ver leitos")
     st.markdown(
         '<p style="font-size:1.3rem; color:#b8e0f0;">Cada bolinha é um leito. Toque nos filtros se quiser.</p>',
         unsafe_allow_html=True,
@@ -500,8 +500,8 @@ elif pagina == "👀 Ver leitos":
                 )
 
 # ----- NÚMEROS (dashboard simplificado) -----
-elif pagina == "📊 Números":
-    st.markdown("## 📊 Números do hospital")
+elif pagina == " Números":
+    st.markdown("##  Números do hospital")
     st.markdown(
         '<p style="font-size:1.3rem; color:#b8e0f0;">Veja de forma simples como estão os leitos hoje.</p>',
         unsafe_allow_html=True,
@@ -617,8 +617,8 @@ elif pagina == "📊 Números":
     st.plotly_chart(fig3, use_container_width=True)
 
 # ----- PREVISÃO DE ALTA (formulário bem simples) -----
-elif pagina == "🔮 Quando o paciente vai embora?":
-    st.markdown("## 🔮 Quando o paciente pode ir embora?")
+elif pagina == " Quando o paciente vai embora?":
+    st.markdown("##  Quando o paciente pode ir embora?")
     st.markdown(
         '<p style="font-size:1.3rem; color:#b8e0f0;">'
         "Preencha os campos e aperte o botão grande. O computador calcula uma estimativa.</p>",
@@ -710,8 +710,8 @@ elif pagina == "🔮 Quando o paciente vai embora?":
         )
 
 # ----- O QUE É ISSO (explicação simples) -----
-elif pagina == "❓ O que é isso?":
-    st.markdown("## ❓ O que é o SMARTLEITO?")
+elif pagina == " O que é isso?":
+    st.markdown("##  O que é o SMARTLEITO?")
     st.markdown(
         """
         <div class="card">
@@ -722,8 +722,8 @@ elif pagina == "❓ O que é isso?":
             <p>
             🟢 Quais camas (leitos) estão livres<br>
             🔴 Quais estão com paciente<br>
-            🔮 Quando um paciente pode ir embora<br>
-            📊 Se o hospital pode ficar cheio nos próximos dias
+             Quando um paciente pode ir embora<br>
+             Se o hospital pode ficar cheio nos próximos dias
             </p>
         </div>
         """,
