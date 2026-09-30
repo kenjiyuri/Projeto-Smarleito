@@ -1,0 +1,49 @@
+id,codigo,setor,status,dias_internado,previsao_alta
+1,L-001,Emergência,Ocupado,1,2026-10-05
+2,L-002,UTI,Ocupado,5,2026-10-05
+3,L-003,Pediatria,Ocupado,18,2026-09-30
+4,L-004,Enfermaria,Ocupado,1,2026-09-30
+5,L-005,Enfermaria,Ocupado,1,2026-10-04
+6,L-006,Pediatria,Em higienização,0,
+7,L-007,Emergência,Ocupado,15,2026-10-04
+8,L-008,UTI,Em higienização,0,
+9,L-009,Enfermaria,Em higienização,0,
+10,L-010,Enfermaria,Ocupado,11,2026-10-02
+11,L-011,Emergência,Livre,0,
+12,L-012,Cirúrgico,Livre,0,
+13,L-013,Emergência,Livre,0,
+14,L-014,Cirúrgico,Ocupado,2,2026-10-05
+15,L-015,Pediatria,Ocupado,13,2026-09-30
+16,L-016,Enfermaria,Ocupado,12,2026-10-04
+17,L-017,UTI,Em higienização,0,
+18,L-018,Enfermaria,Ocupado,10,2026-09-30
+19,L-019,Cirúrgico,Reservado,0,
+20,L-020,Emergência,Ocupado,12,2026-10-01
+21,L-021,UTI,Ocupado,9,2026-10-05
+22,L-022,Enfermaria,Ocupado,6,2026-10-04
+23,L-023,Cirúrgico,Livre,0,
+24,L-024,Emergência,Ocupado,18,2026-10-01
+25,L-025,UTI,Reservado,0,
+26,L-026,Cirúrgico,Ocupado,2,2026-10-02
+27,L-027,Emergência,Ocupado,7,2026-10-04
+28,L-028,Cirúrgico,Livre,0,
+29,L-029,Emergência,Ocupado,15,2026-10-01
+30,L-030,Pediatria,Livre,0,
+31,L-031,Cirúrgico,Ocupado,14,2026-10-04
+32,L-032,Cirúrgico,Ocupado,5,2026-10-04
+33,L-033,UTI,Livre,0,
+34,L-034,Enfermaria,Reservado,0,
+35,L-035,UTI,Ocupado,14,2026-10-04
+36,L-036,Emergência,Ocupado,15,2026-10-04
+37,L-037,UTI,Interditado,0,
+38,L-038,Pediatria,Ocupado,4,2026-10-05
+39,L-039,Emergência,Em higienização,0,
+40,L-040,Cirúrgico,Livre,0,
+41,L-041,UTI,Livre,0,
+42,L-042,Emergência,Interditado,0,
+43,L-043,Enfermaria,Interditado,0,
+44,L-044,Emergência,Ocupado,4,2026-10-05
+45,L-045,Pediatria,Reservado,0,
+46,L-046,Enfermaria,Ocupado,5,2026-10-02
+47,L-047,Pediatria,Ocupado,17,2026-09-30
+48,L-048,Emergência,Ocupado,1,2026-09-30
