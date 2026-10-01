@@ -16,7 +16,12 @@ import requests
 # ---------------------------------------------------------------------------
 # Configuração
 # ---------------------------------------------------------------------------
-API_URL = "http://localhost:8000/api/v1"
+import os
+from pathlib import Path
+
+BASE_DIR = Path(__file__).parent
+# Só usa a API se a variável de ambiente estiver definida (ex.: SMARTLEITO_API=http://localhost:8000/api/v1)
+API_URL = os.environ.get("SMARTLEITO_API", "")
 
 st.set_page_config(
     page_title="SMARTLEITO — Fácil de usar",
@@ -46,6 +51,8 @@ st.markdown(
     section[data-testid="stSidebar"] {
         background: #062a3a !important;
         border-right: 3px solid #1a8aab;
+    }
+    section[data-testid="stSidebar"][aria-expanded="true"] {
         min-width: 280px !important;
     }
     section[data-testid="stSidebar"] * {
@@ -173,8 +180,39 @@ st.markdown(
     /* Tabela legível */
     .stDataFrame { font-size: 1.1rem !important; }
 
-    /* Esconde menus desnecessários */
-    #MainMenu, footer, header { visibility: hidden; }
+    /* Esconde menus desnecessários (mas mantém o botão de abrir/fechar o menu lateral) */
+    #MainMenu, footer, [data-testid="stToolbar"], [data-testid="stDecoration"] { visibility: hidden; }
+    header[data-testid="stHeader"] { background: transparent !important; }
+
+    /* Botão de abrir/fechar o menu: grande, verde e sempre visível */
+    [data-testid="stSidebarCollapsedControl"],
+    [data-testid="stExpandSidebarButton"],
+    [data-testid="stSidebarCollapseButton"] {
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    [data-testid="stSidebarCollapsedControl"] button,
+    [data-testid="stExpandSidebarButton"],
+    [data-testid="stSidebarCollapseButton"] button {
+        background: #1a8aab !important;
+        border: 3px solid #4ade80 !important;
+        border-radius: 14px !important;
+        min-width: 56px !important;
+        min-height: 56px !important;
+        color: #ffffff !important;
+    }
+    [data-testid="stSidebarCollapsedControl"] button:hover,
+    [data-testid="stExpandSidebarButton"]:hover,
+    [data-testid="stSidebarCollapseButton"] button:hover {
+        background: #4ade80 !important;
+        color: #062a3a !important;
+    }
+    [data-testid="stSidebarCollapsedControl"] svg,
+    [data-testid="stExpandSidebarButton"] svg,
+    [data-testid="stSidebarCollapseButton"] svg {
+        width: 28px !important;
+        height: 28px !important;
+    }
 
     /* Botões de navegação rápida no topo */
     .nav-btn {
@@ -228,8 +266,10 @@ st.markdown(
 # ---------------------------------------------------------------------------
 
 def api_get(path: str):
+    if not API_URL:
+        return None
     try:
-        r = requests.get(f"{API_URL}{path}", timeout=2)
+        r = requests.get(f"{API_URL}{path}", timeout=0.5)
         if r.status_code == 200:
             return r.json()
     except Exception:
@@ -238,6 +278,8 @@ def api_get(path: str):
 
 
 def api_post(path: str, payload: dict):
+    if not API_URL:
+        return None
     try:
         r = requests.post(f"{API_URL}{path}", json=payload, timeout=3)
         if r.status_code == 200:
@@ -252,6 +294,9 @@ def carregar_leitos():
     data = api_get("/leitos")
     if data:
         return pd.DataFrame(data)
+    csv_path = BASE_DIR / "leitos.csv"
+    if csv_path.exists():
+        return pd.read_csv(csv_path)
     setores = ["UTI", "Enfermaria", "Emergência", "Cirúrgico", "Pediatria"]
     status_opts = ["Livre", "Ocupado", "Em higienização", "Reservado", "Interditado"]
     pesos = [0.22, 0.48, 0.12, 0.10, 0.08]
@@ -295,17 +340,21 @@ def carregar_resumo():
     }
 
 
+@st.cache_data
 def gerar_historico():
+    csv_path = BASE_DIR / "demanda_historico.csv"
+    if csv_path.exists():
+        h = pd.read_csv(csv_path, parse_dates=["data"])
+        return h.rename(columns={
+            "data": "Data",
+            "demanda_prevista": "Demanda prevista",
+            "ocupacao_real": "Ocupação real",
+        })
+    rng = np.random.default_rng(42)
     datas = pd.date_range(end=datetime.now(), periods=30, freq="D")
-    demanda = np.clip(
-        35 + np.sin(np.arange(30) / 3) * 8 + np.random.normal(0, 4, 30), 15, 55
-    ).astype(int)
-    ocupacao = np.clip(demanda * 0.92 + np.random.normal(0, 2, 30), 10, 48).astype(int)
-    return pd.DataFrame({
-        "Data": datas,
-        "Demanda prevista": demanda,
-        "Ocupação real": ocupacao,
-    })
+    demanda = np.clip(35 + np.sin(np.arange(30) / 3) * 8 + rng.normal(0, 4, 30), 15, 55).astype(int)
+    ocupacao = np.clip(demanda * 0.92 + rng.normal(0, 2, 30), 10, 48).astype(int)
+    return pd.DataFrame({"Data": datas, "Demanda prevista": demanda, "Ocupação real": ocupacao})
 
 
 # ---------------------------------------------------------------------------
@@ -314,25 +363,23 @@ def gerar_historico():
 with st.sidebar:
     st.markdown("##  SMARTLEITO")
     st.markdown("### Menu")
+    ROTULOS = {
+        "home": "Home",
+        "leitos": "Leitos disponíveis",
+        "dashboard": "Dashboard",
+        "alta": "Probabilidade de alta",
+        "sobre": "Quem somos",
+    }
     pagina = st.radio(
         "Escolha uma página",
-        [
-            " Início",
-            " Ver leitos",
-            " Números",
-            " Quando o paciente vai embora?",
-            " O que é isso?",
-            " Quem fez",
-        ],
+        list(ROTULOS.keys()),
+        format_func=lambda k: ROTULOS[k],
         label_visibility="collapsed",
     )
     st.markdown("---")
     st.markdown(
         """
         <p style="font-size:1rem; color:#b8e0f0;">
-         Dica: use os botões grandes.<br>
-         Letras grandes para ler fácil.<br>
-        🟢 Verde = livre · 🔴 Vermelho = ocupado
         </p>
         """,
         unsafe_allow_html=True,
@@ -343,7 +390,7 @@ with st.sidebar:
 # ===========================================================================
 
 # ----- INÍCIO -----
-if pagina == "Início":
+if pagina == "home":
     st.markdown('<p class="hero-title"> SMARTLEITO</p>', unsafe_allow_html=True)
     st.markdown(
         '<p class="hero-sub">Ajuda o hospital a cuidar dos leitos.<br>'
@@ -357,7 +404,7 @@ if pagina == "Início":
         st.markdown(
             """
             <div class="metric-box">
-                <div class="value">👀</div>
+                <div class="value"></div>
                 <div class="label">Ver quais leitos<br>estão livres</div>
             </div>
             """,
@@ -391,8 +438,7 @@ if pagina == "Início":
             <h3> Como usar</h3>
             <p>
             1. No menu à esquerda, toque na página que você quer.<br>
-            2. Os botões são grandes — é só clicar.<br>
-            3. <strong style="color:#4ade80;">Verde</strong> = leito livre ·
+            2. <strong style="color:#4ade80;">Verde</strong> = leito livre ·
                <strong style="color:#f87171;">Vermelho</strong> = leito ocupado.
             </p>
         </div>
@@ -401,7 +447,7 @@ if pagina == "Início":
     )
 
 # ----- VER LEITOS (mapa simples) -----
-elif pagina == " Ver leitos":
+elif pagina == "leitos":
     st.markdown("##  Ver leitos")
     st.markdown(
         '<p style="font-size:1.3rem; color:#b8e0f0;">Cada bolinha é um leito. Toque nos filtros se quiser.</p>',
@@ -472,54 +518,46 @@ elif pagina == " Ver leitos":
         "Interditado": "⚪",
     }
 
-    # Mostrar em linhas de 4
-    cols_per_row = 4
-    rows_list = list(filt.itertuples())
-    for i in range(0, len(rows_list), cols_per_row):
-        cols = st.columns(cols_per_row)
-        for j, col in enumerate(cols):
-            if i + j >= len(rows_list):
-                break
-            row = rows_list[i + j]
-            status = getattr(row, status_col)
-            codigo = getattr(row, cod_col)
-            setor = getattr(row, setor_col)
-            cor = cores_borda.get(status, "#1a8aab")
-            em = emoji_status.get(status, "⬜")
-            with col:
-                st.markdown(
-                    f"""
-                    <div style="background:#0f4a63; border:4px solid {cor}; border-radius:16px;
-                         padding:1.1rem; margin-bottom:0.8rem; text-align:center; min-height:120px;">
-                        <div style="font-size:1.8rem; font-weight:800; color:#fff;">{codigo}</div>
-                        <div style="font-size:1.15rem; color:#b8e0f0; margin:0.3rem 0;">{setor}</div>
-                        <div style="font-size:1.25rem; font-weight:700;">{em} {status}</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+    cards = []
+    for row in filt.itertuples():
+        status = getattr(row, status_col)
+        cor = cores_borda.get(status, "#1a8aab")
+        em = emoji_status.get(status, "⬜")
+        cards.append(
+            f'<div style="background:#0f4a63; border:4px solid {cor}; border-radius:16px;'
+            f' padding:1.1rem; text-align:center; min-height:120px;">'
+            f'<div style="font-size:1.8rem; font-weight:800; color:#fff;">{getattr(row, cod_col)}</div>'
+            f'<div style="font-size:1.15rem; color:#b8e0f0; margin:0.3rem 0;">{getattr(row, setor_col)}</div>'
+            f'<div style="font-size:1.25rem; font-weight:700;">{em} {status}</div></div>'
+        )
+    st.markdown(
+        '<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:0.8rem;">'
+        + "".join(cards) + "</div>",
+        unsafe_allow_html=True,
+    )
+
 
 # ----- NÚMEROS (dashboard simplificado) -----
-elif pagina == " Números":
+elif pagina == "dashboard":
     st.markdown("##  Números do hospital")
     st.markdown(
         '<p style="font-size:1.3rem; color:#b8e0f0;">Veja de forma simples como estão os leitos hoje.</p>',
         unsafe_allow_html=True,
     )
-
+ 
     resumo = carregar_resumo()
     df = carregar_leitos()
     status_col = "status" if "status" in df.columns else "Status"
     setor_col = "setor" if "setor" in df.columns else "Setor"
-
+ 
     k1, k2, k3, k4 = st.columns(4)
     k1.metric("Total de leitos", resumo["total_leitos"])
     k2.metric("🟢 Livres", resumo["livres"])
     k3.metric("🔴 Ocupados", resumo["ocupados"])
     k4.metric("% ocupado", f"{resumo['taxa_ocupacao']}%")
-
+ 
     st.markdown("---")
-
+ 
     c1, c2 = st.columns(2)
     with c1:
         st.subheader("Como estão os leitos?")
@@ -550,7 +588,7 @@ elif pagina == " Números":
             height=420,
         )
         st.plotly_chart(fig, use_container_width=True)
-
+ 
     with c2:
         st.subheader("Ocupados por setor")
         ocup = (
@@ -579,7 +617,7 @@ elif pagina == " Números":
             height=420,
         )
         st.plotly_chart(fig2, use_container_width=True)
-
+ 
     st.subheader("Últimos 30 dias")
     hist = gerar_historico()
     fig3 = go.Figure()
@@ -615,16 +653,16 @@ elif pagina == " Números":
         hovermode="x unified",
     )
     st.plotly_chart(fig3, use_container_width=True)
-
+ 
 # ----- PREVISÃO DE ALTA (formulário bem simples) -----
-elif pagina == " Quando o paciente vai embora?":
+elif pagina == "alta":
     st.markdown("##  Quando o paciente pode ir embora?")
     st.markdown(
         '<p style="font-size:1.3rem; color:#b8e0f0;">'
         "Preencha os campos e aperte o botão grande. O computador calcula uma estimativa.</p>",
         unsafe_allow_html=True,
     )
-
+ 
     with st.form("form_alta"):
         st.markdown("### Dados do paciente")
         c1, c2 = st.columns(2)
@@ -654,8 +692,8 @@ elif pagina == " Quando o paciente vai embora?":
             "Quantas outras doenças o paciente tem?", min_value=0, max_value=10, value=1, step=1
         )
         st.markdown("<br>", unsafe_allow_html=True)
-        submitted = st.form_submit_button("▶️  CALCULAR  —  quando pode ir embora?")
-
+        submitted = st.form_submit_button("▶ CALCULAR  —  quando pode ir embora?")
+ 
     if submitted:
         payload = {
             "idade": int(idade),
@@ -665,7 +703,7 @@ elif pagina == " Quando o paciente vai embora?":
             "comorbidades": int(comorb),
         }
         result = api_post("/previsao/alta", payload)
-
+ 
         if result:
             dias = result["dias_restantes"]
             data_p = result["data_prevista"]
@@ -682,7 +720,7 @@ elif pagina == " Quando o paciente vai embora?":
             dias = max(0.5, round(perm - dias_int, 1))
             data_p = (datetime.now() + timedelta(days=int(np.ceil(dias)))).strftime("%Y-%m-%d")
             conf = 0.65
-
+ 
         # Resultado bem destacado
         if dias <= 1:
             mensagem = "Pode ir embora em breve — talvez ainda hoje ou amanhã."
@@ -693,7 +731,7 @@ elif pagina == " Quando o paciente vai embora?":
         else:
             mensagem = "Ainda precisa de mais alguns dias no hospital."
             cor_borda = "#60a5fa"
-
+ 
         st.markdown(
             f"""
             <div class="card" style="border-color:{cor_borda}; text-align:center; margin-top:1.5rem;">
@@ -708,68 +746,48 @@ elif pagina == " Quando o paciente vai embora?":
             """,
             unsafe_allow_html=True,
         )
+ 
 
-# ----- O QUE É ISSO (explicação simples) -----
-elif pagina == " O que é isso?":
-    st.markdown("##  O que é o SMARTLEITO?")
+# ----- SOBRE + EQUIPE (uma página só) -----
+elif pagina == "sobre":
+    st.markdown("## O que é o SMARTLEITO?")
+
     st.markdown(
         """
         <div class="card">
             <h3>Em poucas palavras</h3>
             <p>
-            O SMARTLEITO é um programa de computador que ajuda o hospital a saber:
-            </p>
-            <p>
-            🟢 Quais camas (leitos) estão livres<br>
-            🔴 Quais estão com paciente<br>
-             Quando um paciente pode ir embora<br>
-             Se o hospital pode ficar cheio nos próximos dias
+            Um programa que ajuda o hospital a saber quais leitos estão livres,
+            quando um paciente pode ir embora e se o hospital pode ficar cheio
+            nos próximos dias. Assim a equipe vê os números com clareza e se
+            prepara antes da lotação, e as pessoas esperam menos na fila.
             </p>
         </div>
         """,
         unsafe_allow_html=True,
     )
-    st.markdown(
-        """
-        <div class="card">
-            <h3>Por que isso importa?</h3>
-            <p>
-            Quando o hospital não planeja bem, as pessoas esperam muito na fila
-            ou ficam sem leito. Com o SMARTLEITO, a equipe vê os números com clareza
-            e se prepara antes de ficar lotado.
-            </p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+
     st.markdown(
         """
         <div class="card">
             <h3>Cores que usamos</h3>
             <p>
             <span class="status-pill pill-livre">🟢 Livre</span>
-            &nbsp;pode receber paciente<br><br>
             <span class="status-pill pill-ocupado">🔴 Ocupado</span>
-            &nbsp;já tem paciente<br><br>
             <span class="status-pill pill-higiene">🟡 Sendo limpo</span>
-            &nbsp;aguardando limpeza<br><br>
             <span class="status-pill pill-reservado">🔵 Reservado</span>
-            &nbsp;separado para alguém<br><br>
             <span class="status-pill pill-interditado">⚪ Interditado</span>
-            &nbsp;não pode usar agora
             </p>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-# ----- EQUIPE -----
-elif pagina == "👥 Quem fez":
-    st.markdown('<p class="hero-title" style="font-size:3rem;">Obrigado!</p>', unsafe_allow_html=True)
     st.markdown(
         """
         <div class="card" style="text-align:center;">
-            <p style="font-size:1.4rem; color:#e0f2fe; line-height:1.8;">
+            <h3>Tech Team</h3>
+            <p style="font-size:1.4rem; line-height:1.8;">
             <strong style="color:#fff;">João Pedro</strong> ·
             <strong style="color:#fff;">Kenji Yuri</strong> ·
             <strong style="color:#fff;">Luca Casari</strong><br>
@@ -777,19 +795,10 @@ elif pagina == "👥 Quem fez":
             <strong style="color:#fff;">Matheus Bargas</strong> ·
             <strong style="color:#fff;">Maria Luiza</strong>
             </p>
-            <p style="font-size:1.2rem; color:#94c5d8; margin-top:1.2rem;">
+            <p style="font-size:1.2rem; color:#94c5d8;">
             Unimar — Universidade de Marília
             </p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        """
-        <div class="card" style="text-align:center;">
-            <p style="font-size:1.25rem; color:#b8e0f0;">
-            Este site foi feito para ser fácil de usar por todo mundo —
-            inclusive idosos e crianças.
+            <p style="font-size:1.1rem; color:#b8e0f0;">
             </p>
         </div>
         """,
