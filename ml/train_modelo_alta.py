@@ -21,10 +21,9 @@ import joblib
 # ---------------------------------------------------------------------------
 
 RNG = np.random.default_rng(42)
-N = 5000
+N = 10000
 
 idade = RNG.integers(1, 95, N)
-dias_internado = RNG.integers(0, 20, N)
 complexidade = RNG.integers(1, 6, N)
 setor = RNG.integers(0, 5, N)  # 0=UTI … 4=Pediatria
 comorbidades = RNG.integers(0, 8, N)
@@ -40,10 +39,19 @@ permanencia_esperada = (
     + RNG.normal(0, 1.2, N)
 )
 
-dias_restantes = np.clip(permanencia_esperada - dias_internado, 0.5, 30)
+# Cauda longa: a maioria fica poucos dias, mas alguns ficam semanas ou meses
+permanencia_total = np.clip(permanencia_esperada, 1, None) * RNG.lognormal(0, 0.8, N)
+
+# Dias já internado: sempre dentro da permanência total
+dias_internado = np.floor(RNG.uniform(0, 1, N) * permanencia_total).astype(int)
+
+# Dias que ainda faltam para a alta
+dias_restantes = np.clip(permanencia_total - dias_internado, 0.5, 365)
 
 X = np.column_stack([idade, dias_internado, complexidade, setor, comorbidades])
 y = dias_restantes
+
+print(f"dias_internado: min={dias_internado.min()}, max={dias_internado.max()}")
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
@@ -68,3 +76,5 @@ out_dir.mkdir(parents=True, exist_ok=True)
 out_path = out_dir / "modelo_alta.joblib"
 joblib.dump(model, out_path)
 print(f"Modelo salvo em: {out_path}")
+
+

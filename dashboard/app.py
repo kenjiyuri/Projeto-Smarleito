@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 import random
 import requests
 
+
 # ---------------------------------------------------------------------------
 # Configuração
 # ---------------------------------------------------------------------------
@@ -22,6 +23,19 @@ from pathlib import Path
 BASE_DIR = Path(__file__).parent
 # Só usa a API se a variável de ambiente estiver definida (ex.: SMARTLEITO_API=http://localhost:8000/api/v1)
 API_URL = os.environ.get("SMARTLEITO_API", "")
+
+import joblib
+
+MODEL_PATH = BASE_DIR.parent / "ml" / "models" / "modelo_alta.joblib"
+SETORES_ALTA = ["UTI", "Enfermaria", "Emergência", "Cirúrgico", "Pediatria"]
+
+
+@st.cache_resource
+def carregar_modelo_alta():
+    try:
+        return joblib.load(MODEL_PATH)
+    except Exception:
+        return None
 
 st.set_page_config(
     page_title="SMARTLEITO — Fácil de usar",
@@ -669,8 +683,9 @@ elif pagina == "alta":
         with c1:
             idade = st.number_input("Idade (anos)", min_value=0, max_value=120, value=55, step=1)
             dias_int = st.number_input(
-                "Há quantos dias está internado?", min_value=0, max_value=60, value=3, step=1
-            )
+                "Há quantos dias está internado?", min_value=0, max_value=365, value=3, step=1)
+
+            
         with c2:
             setor = st.selectbox(
                 "Em qual setor está?",
@@ -692,7 +707,7 @@ elif pagina == "alta":
             "Quantas outras doenças o paciente tem?", min_value=0, max_value=10, value=1, step=1
         )
         st.markdown("<br>", unsafe_allow_html=True)
-        submitted = st.form_submit_button("▶ CALCULAR  —  quando pode ir embora?")
+        submitted = st.form_submit_button("Probabilidade de Alta")
  
     if submitted:
         payload = {
@@ -709,17 +724,27 @@ elif pagina == "alta":
             data_p = result["data_prevista"]
             conf = result["confianca"]
         else:
-            base = {
-                "UTI": 7.5,
-                "Enfermaria": 4.0,
-                "Emergência": 1.5,
-                "Cirúrgico": 5.0,
-                "Pediatria": 3.5,
-            }[setor]
-            perm = base + max(0, (idade - 60) * 0.04) + (complexidade - 3) * 0.8 + comorb * 0.5
-            dias = max(0.5, round(perm - dias_int, 1))
+            modelo = carregar_modelo_alta()
+            if modelo is not None:
+                X = [[int(idade), int(dias_int), int(complexidade),
+                      SETORES_ALTA.index(setor), int(comorb)]]
+                dias = round(float(modelo.predict(X)[0]), 1)
+                conf = 0.7
+                origem = "modelo de machine learning"
+            else:
+                base = {
+                    "UTI": 7.5,
+                    "Enfermaria": 4.0,
+                    "Emergência": 1.5,
+                    "Cirúrgico": 5.0,
+                    "Pediatria": 3.5,
+                }[setor]
+                perm = base + max(0, (idade - 60) * 0.04) + (complexidade - 3) * 0.8 + comorb * 0.5
+                # quem já passou do esperado ainda precisa de um tempo que cresce com a internação
+                dias = round(max(perm - dias_int, 1 + 0.2 * dias_int), 1)
+                conf = 0.65
+                origem = "fórmula simples (modelo não carregado)"
             data_p = (datetime.now() + timedelta(days=int(np.ceil(dias)))).strftime("%Y-%m-%d")
-            conf = 0.65
  
         # Resultado bem destacado
         if dias <= 1:
