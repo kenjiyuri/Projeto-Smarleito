@@ -1,25 +1,56 @@
-# SMARTLEITO
+# SmartLeito
 
 **Gestão inteligente de leitos hospitalares**
 
-Projeto baseado no pitch acadêmico (Unimar). Prevê demanda de leitos, data de alta e disponibiliza um dashboard de gestão.
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-API-009688?logo=fastapi&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-Dashboard-FF4B4B?logo=streamlit&logoColor=white)
+![scikit-learn](https://img.shields.io/badge/scikit--learn-Random%20Forest-F7931E?logo=scikitlearn&logoColor=white)
+![Status](https://img.shields.io/badge/status-prot%C3%B3tipo%20acad%C3%AAmico-lightgrey)
+
+O SmartLeito é um projeto acadêmico (Unimar) que usa Machine Learning para **prever a data de alta de pacientes** e a **demanda futura de leitos**, apresentando tudo em um **dashboard de gestão**.
+
+> **Aviso:** este é um protótipo educacional que utiliza dados sintéticos. Não deve ser usado para decisões clínicas reais.
+
+---
+
+## Sumário
+
+- [Funcionalidades](#funcionalidades)
+- [Stack](#stack)
+- [Estrutura do projeto](#estrutura-do-projeto)
+- [Como rodar](#como-rodar)
+- [Endpoints da API](#endpoints-da-api)
+- [Solução de problemas](#solução-de-problemas)
+- [Equipe](#equipe)
+
+---
+
+## Funcionalidades
+
+- Cadastro, consulta e atualização de leitos por setor e status
+- Dashboard com KPIs de ocupação
+- Previsão de data de alta com Random Forest
+- Previsão de demanda de leitos para os próximos N dias
+- API documentada automaticamente (Swagger UI)
+- Gerador de dados sintéticos para demonstração e testes
 
 ---
 
 ## Stack
 
-| Camada        | Tecnologia                          |
-|---------------|-------------------------------------|
-| Previsão      | Random Forest (scikit-learn)        |
-| Backend       | Python + FastAPI                    |
-| Banco (demo)  | Em memória (pronto para PostgreSQL) |
-| Dashboard     | Streamlit + Plotly                  |
+| Camada       | Tecnologia                          |
+|--------------|-------------------------------------|
+| Previsão     | Random Forest (scikit-learn)        |
+| Backend      | Python + FastAPI                    |
+| Banco (demo) | Em memória (pronto para PostgreSQL) |
+| Dashboard    | Streamlit + Plotly                  |
 
 ---
 
-## Estrutura
+## Estrutura do projeto
 
-```
+```text
 smartleito/
 ├── backend/                 # API FastAPI
 │   ├── app/
@@ -42,38 +73,65 @@ smartleito/
 
 ## Como rodar
 
-### 1. Backend (API)
+### Pré-requisitos
+
+- [Git](https://git-scm.com/)
+- [Python 3.10+](https://www.python.org/downloads/)
+
+### 1. Clonar o repositório
+
+```bash
+git clone https://github.com/kenjiyuri/Projeto-Smarleito
+cd smartleito
+```
+
+### 2. Backend (API)
+
+Execute o backend primeiro, pois o dashboard consome seus dados.
 
 ```bash
 cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# (Recomendado) criar e ativar um ambiente virtual
+python -m venv .venv
+source .venv/bin/activate      # Linux/Mac
+.venv\Scripts\activate         # Windows
+
+python -m pip install -r requirements.txt
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Documentação interativa: http://localhost:8000/docs
+- Swagger UI: http://localhost:8000/docs
+- Mantenha este terminal aberto enquanto usa o dashboard.
 
-### 2. (Opcional) Treinar o modelo de alta
+### 3. Dashboard (Streamlit)
 
-```bash
-cd ml
-pip install scikit-learn joblib numpy
-python train_modelo_alta.py
-```
-
-O modelo é salvo em `ml/models/modelo_alta.joblib` e carregado automaticamente pela API.
-
-### 3. Dashboard
+Em **outro terminal**, a partir da raiz do projeto:
 
 ```bash
 cd dashboard
-pip install -r requirements.txt
-streamlit run app.py
+python -m pip install -r requirements.txt
+python -m streamlit run app.py
 ```
 
-Abre em http://localhost:8501  
-Se a API estiver rodando, o dashboard consome os endpoints; senão, usa dados locais.
+- O painel abre em http://localhost:8501
+- Se a API não estiver rodando, o dashboard usa automaticamente **dados simulados locais**.
 
-### 4. Gerar CSVs de demonstração
+### 4. (Opcional) Treinar o modelo
+
+Para recalibrar o Random Forest de previsão de alta:
+
+```bash
+cd ml
+python -m pip install scikit-learn joblib numpy
+python train_modelo_alta.py
+```
+
+O modelo é salvo em `ml/models/modelo_alta.joblib` e recarregado automaticamente pela API.
+
+### 5. (Opcional) Gerar dados sintéticos
+
+A partir da raiz do projeto:
 
 ```bash
 python data/gerar_dados_demo.py
@@ -81,19 +139,21 @@ python data/gerar_dados_demo.py
 
 ---
 
-## Endpoints principais
+## Endpoints da API
 
-| Método | Rota                        | Descrição                          |
-|--------|-----------------------------|------------------------------------|
-| GET    | `/api/v1/leitos`            | Lista leitos (filtros: setor, status) |
-| GET    | `/api/v1/leitos/resumo`     | KPIs do dashboard                  |
-| GET    | `/api/v1/leitos/{id}`       | Detalhe de um leito                |
-| POST   | `/api/v1/leitos`            | Cria leito                         |
-| PATCH  | `/api/v1/leitos/{id}`       | Atualiza status/setor              |
-| POST   | `/api/v1/previsao/alta`     | Prevê data de alta                 |
-| POST   | `/api/v1/previsao/demanda`  | Prevê demanda nos próximos N dias  |
+Base URL: `http://localhost:8000/api/v1`
 
-### Exemplo — previsão de alta
+| Método | Rota                | Descrição                                 |
+|--------|---------------------|-------------------------------------------|
+| GET    | `/leitos`           | Lista leitos (filtros: `setor`, `status`) |
+| GET    | `/leitos/resumo`    | KPIs do dashboard                         |
+| GET    | `/leitos/{id}`      | Detalhe de um leito                       |
+| POST   | `/leitos`           | Cria um leito                             |
+| PATCH  | `/leitos/{id}`      | Atualiza status/setor                     |
+| POST   | `/previsao/alta`    | Prevê a data de alta                      |
+| POST   | `/previsao/demanda` | Prevê a demanda nos próximos N dias       |
+
+### Exemplo: previsão de alta
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/previsao/alta \
@@ -109,8 +169,20 @@ curl -X POST http://localhost:8000/api/v1/previsao/alta \
 
 ---
 
+## Solução de problemas
+
+| Problema                          | Solução                                                         |
+|-----------------------------------|-----------------------------------------------------------------|
+| `pip` não é reconhecido (Windows) | Use `python -m pip ...`                                         |
+| Porta 8000 ou 8501 em uso         | Troque a porta (`--port 8001` / `--server.port 8502`)           |
+| Dashboard mostra dados simulados  | Verifique se a API está rodando em http://localhost:8000        |
+| Erro ao carregar o modelo         | Execute o treinamento (passo 4) para gerar `modelo_alta.joblib` |
+
+
+---
+
 ## Equipe
 
-João Pedro · Kenji Yuri · Luca Casari · Lucia Maria · Matheus Bargas · Maria Luiza  
+João Pedro · Kenji Yuri · Luca Casari · Lucia Maria · Matheus Bargas · Maria Luiza
 
 **Unimar — Universidade de Marília**
