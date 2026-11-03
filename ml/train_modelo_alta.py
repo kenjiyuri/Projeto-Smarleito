@@ -6,7 +6,7 @@ Gera dados sintéticos realistas e salva o modelo em ml/models/modelo_alta.jobli
 Uso:
     python ml/train_modelo_alta.py
 """
-
+import sys
 from pathlib import Path
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
@@ -14,6 +14,16 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, r2_score
 import joblib
 
+sys.path.insert(
+    0,
+    str(Path(__file__).resolve().parents[1])
+)
+
+from ml.preprocessing import (
+    SETORES,
+    FEATURES,
+    montar_features,
+)
 # ---------------------------------------------------------------------------
 # Dados sintéticos
 # Features: idade, dias_internado, complexidade (1-5), setor_encoded (0-4), comorbidades
@@ -48,7 +58,17 @@ dias_internado = np.floor(RNG.uniform(0, 1, N) * permanencia_total).astype(int)
 # Dias que ainda faltam para a alta
 dias_restantes = np.clip(permanencia_total - dias_internado, 0.5, 365)
 
-X = np.column_stack([idade, dias_internado, complexidade, setor, comorbidades])
+setor_nome = [SETORES[i] for i in setor]
+
+X = montar_features(
+    idade,
+    dias_internado,
+    complexidade,
+    setor_nome,
+    comorbidades
+)
+
+assert X.shape[1] == len(FEATURES)
 y = dias_restantes
 
 print(f"dias_internado: min={dias_internado.min()}, max={dias_internado.max()}")

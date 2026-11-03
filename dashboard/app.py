@@ -12,7 +12,7 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import random
 import requests
-
+import sys
 
 # ---------------------------------------------------------------------------
 # Configuração
@@ -26,16 +26,34 @@ API_URL = os.environ.get("SMARTLEITO_API", "")
 
 import joblib
 
-MODEL_PATH = BASE_DIR.parent / "ml" / "models" / "modelo_alta.joblib"
-SETORES_ALTA = ["UTI", "Enfermaria", "Emergência", "Cirúrgico", "Pediatria"]
+# Permite importar o pré-processamento compartilhado em ml/
+RAIZ_PROJETO = BASE_DIR.parent
+
+if str(RAIZ_PROJETO) not in sys.path:
+    sys.path.insert(0, str(RAIZ_PROJETO))
+
+from ml.preprocessing import SETORES, montar_features
+
+MODEL_PATH = RAIZ_PROJETO / "ml" / "models" / "modelo_alta.joblib"
+SETORES_ALTA = SETORES
 
 
 @st.cache_resource
-def carregar_modelo_alta():
+def _carregar_modelo(path: str, mtime: float):
     try:
-        return joblib.load(MODEL_PATH)
+        return joblib.load(path)
     except Exception:
         return None
+
+
+def carregar_modelo_alta():
+    if not MODEL_PATH.exists():
+        return None
+
+    return _carregar_modelo(
+        str(MODEL_PATH),
+        MODEL_PATH.stat().st_mtime,
+    )
 
 st.set_page_config(
     page_title="SMARTLEITO — Fácil de usar",
@@ -723,11 +741,19 @@ elif pagina == "alta":
             dias = result["dias_restantes"]
             data_p = result["data_prevista"]
             conf = result["confianca"]
+            origem = "API"
         else:
             modelo = carregar_modelo_alta()
+
             if modelo is not None:
-                X = [[int(idade), int(dias_int), int(complexidade),
-                      SETORES_ALTA.index(setor), int(comorb)]]
+                X = montar_features(
+                    int(idade),
+                    int(dias_int),
+                    int(complexidade),
+                    setor,
+                    int(comorb),
+                )
+
                 dias = round(float(modelo.predict(X)[0]), 1)
                 conf = 0.7
                 origem = "modelo de machine learning"
