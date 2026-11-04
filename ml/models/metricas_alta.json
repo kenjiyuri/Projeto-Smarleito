@@ -1,0 +1,16 @@
+{
+  "gerado_em": "2026-11-04T18:17:34",
+  "sklearn": "1.9.1",
+  "amostras": 10000,
+  "melhores_hiperparametros": {
+    "n_estimators": 200,
+    "min_samples_leaf": 16,
+    "max_features": 0.6,
+    "max_depth": 14
+  },
+  "mae_validacao_cruzada": 1.672,
+  "mae_validacao_cruzada_params_antigos": 1.685,
+  "mae_teste": 1.61,
+  "r2_teste": 0.346,
+  "mae_baseline": 2.108
+}

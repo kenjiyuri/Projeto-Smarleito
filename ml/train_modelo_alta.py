@@ -6,11 +6,14 @@ Gera dados sintéticos realistas e salva o modelo em ml/models/modelo_alta.jobli
 Uso:
     python ml/train_modelo_alta.py
 """
+import json
 import sys
+from datetime import datetime
 from pathlib import Path
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import train_test_split
+from sklearn.base import clone
+from sklearn.model_selection import KFold, RandomizedSearchCV, cross_val_score, train_test_split
 from sklearn.metrics import mean_absolute_error, r2_score
 import joblib
 
@@ -154,31 +157,60 @@ y = dias_restantes
 
 print(f"dias_internado: min={dias_internado.min()}, max={dias_internado.max()}")
 
+# ---------------------------------------------------------------------------
+# Validação e seleção de hiperparâmetros (issue #16)
+#   1. Separa 20% como TESTE FINAL, que não participa de nenhuma escolha.
+#   2. Escolhe os hiperparâmetros por validação cruzada (5 partes) só no treino.
+#   3. Compara com os parâmetros antigos e com o baseline "sempre a média".
+#   4. Mede o erro final no teste e salva as métricas em JSON.
+# ---------------------------------------------------------------------------
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-model = RandomForestRegressor(
-    n_estimators=120,
-    max_depth=10,
-    min_samples_leaf=4,
-    random_state=42,
-    n_jobs=-1,
-)
-model.fit(X_train, y_train)
+cv = KFold(n_splits=5, shuffle=True, random_state=42)
 
-pred = model.predict(X_test)
+# Parâmetros usados antes desta issue (referência para comparar)
+PARAMS_ANTIGOS = dict(n_estimators=120, max_depth=10, min_samples_leaf=4)
+
+espaco = {
+    "n_estimators": [100, 200, 300],
+    "max_depth": [6, 8, 10, 14, None],
+    "min_samples_leaf": [2, 4, 8, 16],
+    "max_features": [1.0, 0.8, 0.6],
+}
+
+busca = RandomizedSearchCV(
+    RandomForestRegressor(random_state=42, n_jobs=-1),
+    param_distributions=espaco,
+    n_iter=20,
+    scoring="neg_mean_absolute_error",
+    cv=cv,
+    random_state=42,
+    n_jobs=1,  # o paralelismo já está dentro do RandomForest
+    refit=True,
+)
+busca.fit(X_train, y_train)
+
+mae_cv_melhor = -busca.best_score_
+modelo_antigo = RandomForestRegressor(random_state=42, n_jobs=-1, **PARAMS_ANTIGOS)
+mae_cv_antigo = -cross_val_score(
+    modelo_antigo, X_train, y_train, cv=cv, scoring="neg_mean_absolute_error"
+).mean()
+
+print("\nMelhores hiperparâmetros:", busca.best_params_)
+print(f"MAE na validação cruzada: {mae_cv_melhor:.3f} dias "
+      f"(parâmetros antigos: {mae_cv_antigo:.3f})")
+
+# Avaliação FINAL, uma única vez, no teste que ficou de fora
+pred = busca.best_estimator_.predict(X_test)
 mae = mean_absolute_error(y_test, pred)
 r2 = r2_score(y_test, pred)
+baseline = mean_absolute_error(y_test, np.full_like(y_test, y_train.mean()))
 
-baseline = mean_absolute_error(
-    y_test,
-    np.full_like(y_test, y_train.mean()),
-)
+print(f"MAE no teste: {mae:.2f} dias (baseline 'sempre a média': {baseline:.2f})")
+print(f"R² no teste:  {r2:.3f}")
 
-print(
-    f"MAE: {mae:.2f} dias "
-    f"(baseline 'sempre a média': {baseline:.2f})"
-)
-print(f"R²:  {r2:.3f}")
+# Modelo final: mesmos hiperparâmetros, treinado com TODOS os dados
+model = clone(busca.best_estimator_).fit(X, y)
 
 out_dir = Path(__file__).parent / "models"
 out_dir.mkdir(parents=True, exist_ok=True)
@@ -186,4 +218,20 @@ out_path = out_dir / "modelo_alta.joblib"
 joblib.dump(model, out_path)
 print(f"Modelo salvo em: {out_path}")
 
+import sklearn  # noqa: E402
 
+metricas = {
+    "gerado_em": datetime.now().isoformat(timespec="seconds"),
+    "sklearn": sklearn.__version__,
+    "amostras": int(len(y)),
+    "melhores_hiperparametros": busca.best_params_,
+    "mae_validacao_cruzada": round(float(mae_cv_melhor), 3),
+    "mae_validacao_cruzada_params_antigos": round(float(mae_cv_antigo), 3),
+    "mae_teste": round(float(mae), 3),
+    "r2_teste": round(float(r2), 3),
+    "mae_baseline": round(float(baseline), 3),
+}
+(out_dir / "metricas_alta.json").write_text(
+    json.dumps(metricas, indent=2, ensure_ascii=False), encoding="utf-8"
+)
+print(f"Métricas salvas em: {out_dir / 'metricas_alta.json'}")
