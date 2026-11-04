@@ -5,6 +5,7 @@ Em produção: carregar modelo treinado (joblib) de ml/models/.
 Aqui usamos um modelo simplificado + heurísticas para funcionar offline.
 """
 
+import csv
 import math
 import sys
 import threading
@@ -20,7 +21,9 @@ from app.schemas.leito import (
     PrevisaoDemandaResponse,
     PrevisaoDemandaItem,
     Setor,
+    StatusLeito,
 )
+from app.services import leitos_service
 # Caminho raiz do projeto
 _RAIZ = Path(__file__).resolve().parents[3]
 
@@ -113,43 +116,78 @@ def prever_alta(req: PrevisaoAltaRequest) -> PrevisaoAltaResponse:
         confianca=confianca,
     )
 
+# ---------------------------------------------------------------------------
+# Previsão de demanda (issue #15)
+# Antes: baselines fixos por setor + senoide com fase presa ao "dia de hoje".
+# Agora: ponto de partida = ocupação REAL atual (leitos) e padrão semanal
+# estimado do histórico (data/demanda_historico.csv), sem funções inventadas.
+# ---------------------------------------------------------------------------
+_HISTORICO_PATH = _RAIZ / "data" / "demanda_historico.csv"
+_FATORES_PADRAO = [1.0, 1.0, 1.0, 1.0, 1.0, 0.85, 0.85]  # seg..dom, usado sem histórico
+_cache_fatores = {"mtime": None, "valores": _FATORES_PADRAO}
+
+
+def _fatores_semanais() -> list[float]:
+    """
+    Fator multiplicativo por dia da semana (0=segunda), estimado do histórico.
+    Suavizado pela metade em direção a 1.0 (histórico curto = pouca confiança).
+    Sem histórico suficiente (menos de 14 dias, ou menos de 3 por dia da semana),
+    usa o padrão. Recarrega sozinho quando o CSV muda.
+    """
+    try:
+        mtime = _HISTORICO_PATH.stat().st_mtime
+    except OSError:
+        return _FATORES_PADRAO
+    if _cache_fatores["mtime"] == mtime:
+        return _cache_fatores["valores"]
+
+    por_dia: dict[int, list[float]] = {i: [] for i in range(7)}
+    try:
+        with open(_HISTORICO_PATH, newline="", encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                d = date.fromisoformat(row["data"])
+                por_dia[d.weekday()].append(float(row["ocupacao_real"]))
+    except (OSError, KeyError, ValueError):
+        return _FATORES_PADRAO
+
+    todos = [v for vs in por_dia.values() for v in vs]
+    if len(todos) < 14 or any(len(vs) < 3 for vs in por_dia.values()):
+        valores = _FATORES_PADRAO
+    else:
+        media = sum(todos) / len(todos)
+        valores = [1 + 0.5 * (sum(vs) / len(vs) / media - 1) for vs in por_dia.values()]
+
+    _cache_fatores["mtime"], _cache_fatores["valores"] = mtime, valores
+    return valores
+
+
 def prever_demanda(req: PrevisaoDemandaRequest) -> PrevisaoDemandaResponse:
     """
-    Gera série de demanda prevista para os próximos N dias.
-    Usa sazonalidade senoidal + ruído controlado (demo).
+    Prevê a demanda de leitos para os próximos N dias.
+
+    demanda(dia) = leitos em uso hoje (ocupados + reservados)
+                   x fator do dia da semana / fator de hoje
+    Hoje coincide com o valor real; os demais dias seguem o padrão semanal.
+    Livres estimados = capacidade (leitos não interditados) - demanda.
     """
     hoje = date.today()
+    fatores = _fatores_semanais()
+    fator_hoje = fatores[hoje.weekday()]
+
+    leitos = leitos_service.listar(setor=req.setor)
+    capacidade = sum(1 for l in leitos if l.status != StatusLeito.INTERDITADO)
+    em_uso = sum(1 for l in leitos if l.status in (StatusLeito.OCUPADO, StatusLeito.RESERVADO))
+
     previsoes = []
-
-    # Baseline por setor
-    baseline = {
-        Setor.UTI: 12,
-        Setor.ENFERMARIA: 28,
-        Setor.EMERGENCIA: 18,
-        Setor.CIRURGICO: 15,
-        Setor.PEDIATRIA: 10,
-    }
-
-    setores = [req.setor] if req.setor else list(Setor)
-
     for i in range(req.dias_a_frente):
         d = hoje + timedelta(days=i)
-        # Sazonalidade semanal (fim de semana ↓) + tendência leve
-        fator_semana = 0.85 if d.weekday() >= 5 else 1.0
-        onda = 1 + 0.12 * math.sin(2 * math.pi * i / 7)
-
-        if req.setor:
-            dem = int(baseline[req.setor] * fator_semana * onda)
-            livres_est = max(2, int(dem * 0.25))
-        else:
-            dem = int(sum(baseline.values()) * fator_semana * onda / len(Setor) * 1.1)
-            livres_est = max(5, int(dem * 0.22))
-
+        dem = round(em_uso * fatores[d.weekday()] / fator_hoje)
+        dem = max(0, min(dem, capacidade))
         previsoes.append(
             PrevisaoDemandaItem(
                 data=d,
                 demanda_prevista=dem,
-                leitos_livres_estimados=livres_est,
+                leitos_livres_estimados=max(0, capacidade - dem),
             )
         )
 
