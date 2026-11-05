@@ -61,6 +61,9 @@ class PrevisaoAltaResponse(BaseModel):
     dias_restantes: float
     data_prevista: date
     confianca: float = Field(..., ge=0, le=1)
+     # Faixa que cobriu ~80% dos casos de teste (None se o modelo não tiver métricas)
+    intervalo_min: Optional[float] = None
+    intervalo_max: Optional[float] = None
 
 
 class PrevisaoDemandaRequest(BaseModel):

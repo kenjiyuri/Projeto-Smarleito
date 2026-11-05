@@ -5,6 +5,7 @@ Em produção: carregar modelo treinado (joblib) de ml/models/.
 Aqui usamos um modelo simplificado + heurísticas para funcionar offline.
 """
 
+
 import csv
 import math
 import sys
@@ -32,6 +33,7 @@ if str(_RAIZ) not in sys.path:
     sys.path.insert(0, str(_RAIZ))
 
 from ml.preprocessing import montar_features
+from ml.incerteza import intervalo_previsao, COBERTURA
 
 # Caminho do modelo treinado
 _MODEL_PATH = _RAIZ / "ml" / "models" / "modelo_alta.joblib"
@@ -92,7 +94,9 @@ def prever_alta(req: PrevisaoAltaRequest) -> PrevisaoAltaResponse:
         )
 
         dias = float(modelo.predict(X)[0])
-        confianca = 0.82
+        faixa = intervalo_previsao(dias, req.setor)
+        # "confianca" = cobertura real da faixa nos testes (não é um valor inventado)
+        confianca = COBERTURA if faixa else 0.65
     else:
         # Heurística: permanência esperada − dias já internado + ajustes
         base = _PERMANENCIA_SETOR.get(req.setor, 4.0)
@@ -105,6 +109,7 @@ def prever_alta(req: PrevisaoAltaRequest) -> PrevisaoAltaResponse:
         )
 
         dias = max(0.5, permanencia_esperada - req.dias_internado)
+        faixa = None  # heurística sem validação: não há faixa confiável
         confianca = 0.65
 
     dias = round(dias, 1)
@@ -114,8 +119,9 @@ def prever_alta(req: PrevisaoAltaRequest) -> PrevisaoAltaResponse:
         dias_restantes=dias,
         data_prevista=data_prevista,
         confianca=confianca,
+        intervalo_min=faixa[0] if faixa else None,
+        intervalo_max=faixa[1] if faixa else None,
     )
-
 # ---------------------------------------------------------------------------
 # Previsão de demanda (issue #15)
 # Antes: baselines fixos por setor + senoide com fase presa ao "dia de hoje".
