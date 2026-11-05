@@ -12,10 +12,14 @@ env/
 # Streamlit
 .streamlit/secrets.toml
 
-# Variáveis de ambiente
+# Variï¿½veis de ambiente
 .env
 .env.*
 
 # Sistema e editor
 .DS_Store
 .vscode/
+
+node_modules/
+cypress/screenshots/
+cypress/videos/
