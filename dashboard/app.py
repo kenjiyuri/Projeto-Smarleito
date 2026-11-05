@@ -728,7 +728,7 @@ elif pagina == "alta":
         st.markdown("<br>", unsafe_allow_html=True)
         submitted = st.form_submit_button("Probabilidade de Alta")
  
-       if submitted:
+    if submitted:
         payload = {
             "idade": int(idade),
             "dias_internado": int(dias_int),
