@@ -33,6 +33,7 @@ if str(RAIZ_PROJETO) not in sys.path:
     sys.path.insert(0, str(RAIZ_PROJETO))
 
 from ml.preprocessing import SETORES, montar_features
+from ml.incerteza import intervalo_previsao
 
 MODEL_PATH = RAIZ_PROJETO / "ml" / "models" / "modelo_alta.joblib"
 SETORES_ALTA = SETORES
@@ -727,7 +728,7 @@ elif pagina == "alta":
         st.markdown("<br>", unsafe_allow_html=True)
         submitted = st.form_submit_button("Probabilidade de Alta")
  
-    if submitted:
+       if submitted:
         payload = {
             "idade": int(idade),
             "dias_internado": int(dias_int),
@@ -736,12 +737,17 @@ elif pagina == "alta":
             "comorbidades": int(comorb),
         }
         result = api_post("/previsao/alta", payload)
- 
+
         if result:
             dias = result["dias_restantes"]
             data_p = result["data_prevista"]
             conf = result["confianca"]
             origem = "API"
+
+            if result.get("intervalo_min") is not None and result.get("intervalo_max") is not None:
+                faixa = (result["intervalo_min"], result["intervalo_max"])
+            else:
+                faixa = None
         else:
             modelo = carregar_modelo_alta()
 
@@ -757,6 +763,7 @@ elif pagina == "alta":
                 dias = round(float(modelo.predict(X)[0]), 1)
                 conf = 0.7
                 origem = "modelo de machine learning"
+                faixa = intervalo_previsao(dias, setor)
             else:
                 base = {
                     "UTI": 7.5,
@@ -770,6 +777,8 @@ elif pagina == "alta":
                 dias = round(max(perm - dias_int, 1 + 0.2 * dias_int), 1)
                 conf = 0.65
                 origem = "fórmula simples (modelo não carregado)"
+                faixa = None
+
             data_p = (datetime.now() + timedelta(days=int(np.ceil(dias)))).strftime("%Y-%m-%d")
  
         # Resultado bem destacado
@@ -782,21 +791,43 @@ elif pagina == "alta":
         else:
             mensagem = "Ainda precisa de mais alguns dias no hospital."
             cor_borda = "#60a5fa"
- 
+        texto_faixa = ""
+
+        if faixa:
+            texto_faixa = (
+                '<p style="font-size:1.2rem; color:#e0f2fe; margin-top:0.6rem;">'
+                f'Faixa estimada: entre <strong>{faixa[0]}</strong> e '
+                f'<strong>{faixa[1]}</strong> dias.'
+                '</p>'
+            )
         st.markdown(
             f"""
             <div class="card" style="border-color:{cor_borda}; text-align:center; margin-top:1.5rem;">
-                <p style="font-size:1.4rem; color:#b8e0f0; margin-bottom:0.5rem;">Estimativa</p>
-                <p class="big-number">{dias} dias</p>
-                <p class="big-label">Data aproximada: <strong style="color:#fff;">{data_p}</strong></p>
-                <p style="font-size:1.25rem; color:#e0f2fe; margin-top:1rem;">{mensagem}</p>
-                <p style="font-size:1rem; color:#94c5d8; margin-top:0.8rem;">
-                Isso é só uma ajuda. O médico decide de verdade.
+
+                <p style="font-size:1.4rem; color:#b8e0f0; margin-bottom:0.5rem;">
+                    Estimativa
                 </p>
+
+                <p class="big-number">{dias} dias</p>
+
+                <p class="big-label">
+                    Data aproximada: <strong style="color:#fff;">{data_p}</strong>
+                </p>
+
+                <p style="font-size:1.25rem; color:#e0f2fe; margin-top:1rem;">
+                    {mensagem}
+                </p>
+
+                {texto_faixa}
+
+                <p style="font-size:1rem; color:#94c5d8; margin-top:0.8rem;">
+                    Isso é só uma ajuda. O médico decide de verdade.
+                </p>
+
             </div>
             """,
             unsafe_allow_html=True,
-        )
+)
  
 
 # ----- SOBRE + EQUIPE (uma página só) -----

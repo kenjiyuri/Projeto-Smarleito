@@ -206,6 +206,20 @@ mae = mean_absolute_error(y_test, pred)
 r2 = r2_score(y_test, pred)
 baseline = mean_absolute_error(y_test, np.full_like(y_test, y_train.mean()))
 
+# Faixa de incerteza (issue #13): percentis 10 e 90 do erro (real - previsto) no teste
+erro = y_test - pred
+setor_teste = X_test[:, FEATURES.index("setor")].astype(int)
+intervalo_80 = {
+    "geral": [round(float(np.percentile(erro, 10)), 3), round(float(np.percentile(erro, 90)), 3)],
+    "por_setor": {
+        nome: [
+            round(float(np.percentile(erro[setor_teste == i], 10)), 3),
+            round(float(np.percentile(erro[setor_teste == i], 90)), 3),
+        ]
+        for i, nome in enumerate(SETORES)
+    },
+}
+
 print(f"MAE no teste: {mae:.2f} dias (baseline 'sempre a média': {baseline:.2f})")
 print(f"R² no teste:  {r2:.3f}")
 
@@ -230,6 +244,7 @@ metricas = {
     "mae_teste": round(float(mae), 3),
     "r2_teste": round(float(r2), 3),
     "mae_baseline": round(float(baseline), 3),
+    "intervalo_80": intervalo_80,
 }
 (out_dir / "metricas_alta.json").write_text(
     json.dumps(metricas, indent=2, ensure_ascii=False), encoding="utf-8"
