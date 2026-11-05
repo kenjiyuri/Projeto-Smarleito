@@ -1,0 +1,27 @@
+{
+  "name": "projeto-smarleito",
+  "version": "1.0.0",
+  "description": "**Gestão inteligente de leitos hospitalares**",
+  "main": "cypress.config.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kenjiyuri/Projeto-Smarleito.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/kenjiyuri/Projeto-Smarleito/issues"
+  },
+  "homepage": "https://github.com/kenjiyuri/Projeto-Smarleito#readme",
+  "devDependencies": {
+    "cypress": "^16.2.1"
+  },
+  "allowScripts": {
+    "cypress@16.2.1": true
+  }
+}
