@@ -9,7 +9,8 @@ para facilitar o ajuste ao padrão oficial da instituição.
 import os
 import random
 import sys
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
+from html import escape
 from pathlib import Path
 
 import joblib
@@ -29,8 +30,12 @@ RAIZ_PROJETO = BASE_DIR.parent
 # (ex.: SMARTLEITO_API=http://localhost:8000/api/v1)
 API_URL = os.environ.get("SMARTLEITO_API", "")
 
-if str(RAIZ_PROJETO) not in sys.path:
-    sys.path.insert(0, str(RAIZ_PROJETO))
+for _p in (RAIZ_PROJETO, BASE_DIR):
+    if str(_p) not in sys.path:
+        sys.path.insert(0, str(_p))
+
+import comorbidades as cmb  # noqa: E402
+import setores as stor  # noqa: E402
 
 from ml.incerteza import intervalo_previsao  # noqa: E402
 from ml.preprocessing import SETORES, montar_features  # noqa: E402
@@ -73,9 +78,11 @@ FUNDO_STATUS = {
 
 PAGINAS = {
     "inicio": "Início",
-    "leitos": "Mapa de Leitos",
-    "painel": "Painel Gerencial",
+    "leitos": "Leitos",
+    "painel": "Painel",
+    "setores": "Setores",
     "alta": "Previsão de Alta",
+    "comorb": "Comorbidades",
     "sobre": "Institucional",
 }
 
@@ -142,18 +149,23 @@ p, li, label, span { color: var(--texto); }
     box-shadow: 0 2px 8px rgba(20, 56, 116, 0.10); position: relative; z-index: 5;
 }
 .marca { display: flex; align-items: center; gap: 0.7rem; padding: 0.5rem 0; }
-.marca svg { width: 46px; height: 46px; flex: none; }
+.marca img {
+    width: 150px;
+    height: auto;
+    display: block;
+    object-fit: contain;
+}
 .marca-txt { line-height: 1; }
 .marca-leg { font-family: 'Montserrat', sans-serif; font-size: 0.62rem; font-weight: 700; letter-spacing: .06em; color: var(--primaria); text-transform: uppercase; }
 .marca-nome { font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 1.7rem; color: var(--secundaria); letter-spacing: -0.01em; margin-top: 3px; }
 
 .st-key-topo div[data-testid="stRadio"] > div[role="radiogroup"] { justify-content: flex-end; gap: 0.2rem !important; flex-wrap: wrap; }
 .st-key-topo div[data-testid="stRadio"] label {
-    padding: 0.55rem 1.15rem !important; margin: 0 !important; border-radius: 999px; cursor: pointer; transition: background .15s;
+    padding: 0.5rem 0.85rem !important; margin: 0 !important; border-radius: 999px; cursor: pointer; transition: background .15s;
 }
 .st-key-topo div[data-testid="stRadio"] label > div > div:first-child { display: none !important; }
 .st-key-topo div[data-testid="stRadio"] label p {
-    font-family: 'Montserrat', sans-serif; font-weight: 600; font-size: 0.98rem; color: var(--primaria) !important; margin: 0;
+    font-family: 'Montserrat', sans-serif; font-weight: 600; font-size: 0.92rem; color: var(--primaria) !important; margin: 0; white-space: nowrap;
 }
 .st-key-topo div[data-testid="stRadio"] label:hover { background: #E8F4F3; }
 .st-key-topo div[data-testid="stRadio"] label:has(input:checked) { background: var(--secundaria); }
@@ -196,19 +208,19 @@ p, li, label, span { color: var(--texto); }
 
 /* ---------- Faixa de atalhos ---------- */
 .atalhos {
-    display: grid; grid-template-columns: repeat(4, 1fr); background: var(--primaria);
+    display: grid; grid-template-columns: repeat(5, 1fr); background: var(--primaria);
     margin: 0 var(--sangria) 2.2rem; padding: 0 var(--sangria-pad); border-top: 4px solid var(--destaque);
 }
 .atalho {
-    display: flex; align-items: center; gap: 1rem; padding: 2.2rem 1.4rem; text-decoration: none !important;
+    display: flex; align-items: center; gap: 0.8rem; padding: 2rem 1.1rem; text-decoration: none !important;
     border-left: 2px solid var(--secundaria); transition: background .15s;
 }
 .atalho:first-child { border-left: none; }
 .atalho:hover { background: var(--primaria-escura); }
-.atalho svg { width: 46px; height: 46px; flex: none; stroke: var(--secundaria); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.atalho span { color: #fff !important; font-family: 'Montserrat', sans-serif; font-weight: 600; font-size: 1.05rem; line-height: 1.3; }
-@media (max-width: 900px) { .atalhos { grid-template-columns: repeat(2, 1fr); } .atalho:nth-child(3) { border-left: none; } }
-@media (max-width: 560px) { .atalhos { grid-template-columns: 1fr; } .atalho { border-left: none; border-top: 2px solid var(--secundaria); } }
+.atalho svg { width: 40px; height: 40px; flex: none; stroke: var(--secundaria); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.atalho span { color: #fff !important; font-family: 'Montserrat', sans-serif; font-weight: 600; font-size: 0.95rem; line-height: 1.3; }
+@media (max-width: 900px) { .atalhos { grid-template-columns: repeat(2, 1fr); } .atalho { border-left: none; border-top: 2px solid var(--secundaria); } }
+@media (max-width: 560px) { .atalhos { grid-template-columns: 1fr; } }
 
 /* ---------- Títulos e cartões ---------- */
 .titulo-pagina { margin: 2.2rem 0 0.2rem 0; }
@@ -262,6 +274,39 @@ div[data-testid="stForm"] { background: var(--superficie); border: 1px solid var
 .resultado .grande { font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 3rem; color: var(--primaria); line-height: 1.2; }
 .aviso { font-size: 0.85rem; color: var(--texto-suave); margin-top: 1rem; }
 
+div[data-testid="stMarkdownContainer"] h3 { margin-top: 0.8rem; }
+
+/* ---------- Seletor de setor ---------- */
+.st-key-seletor div[data-testid="stRadio"] > div[role="radiogroup"] { gap: 0.5rem !important; flex-wrap: wrap; }
+.st-key-seletor div[data-testid="stRadio"] label {
+    padding: 0.55rem 1.4rem !important; margin: 0 !important; border: 2px solid var(--secundaria);
+    border-radius: 999px; background: #fff; cursor: pointer; transition: background .15s;
+}
+.st-key-seletor div[data-testid="stRadio"] label > div > div:first-child { display: none !important; }
+.st-key-seletor div[data-testid="stRadio"] label p { color: var(--secundaria) !important; font-family: 'Montserrat', sans-serif; font-weight: 700; margin: 0; }
+.st-key-seletor div[data-testid="stRadio"] label:hover { background: #E8F4F3; }
+.st-key-seletor div[data-testid="stRadio"] label:has(input:checked) { background: var(--secundaria); }
+.st-key-seletor div[data-testid="stRadio"] label:has(input:checked) p { color: #fff !important; }
+
+/* ---------- Situação do setor, regras e tabelas ---------- */
+.situacao { display: flex; align-items: center; gap: 1.2rem; border: 1px solid; border-left-width: 6px; border-radius: 12px; padding: 1rem 1.4rem; margin: 1.2rem 0; flex-wrap: wrap; }
+.situacao .nivel { font-family: 'Montserrat', sans-serif; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; font-size: .9rem; }
+.situacao .msg { color: var(--texto); font-size: 0.98rem; }
+.regras { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0.8rem; margin-bottom: 1rem; }
+.regra { background: var(--superficie); border: 1px solid var(--borda); border-left: 5px solid; border-radius: 10px; padding: 0.9rem 1rem; }
+.regra .t { font-family: 'Montserrat', sans-serif; font-weight: 700; color: var(--primaria); font-size: 0.95rem; }
+.regra .s { font-size: .75rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; margin: 0.25rem 0; }
+.regra .d { color: var(--texto-suave); font-size: 0.9rem; line-height: 1.4; }
+.tabela-rolagem { max-height: 520px; overflow: auto; border: 1px solid var(--borda); border-radius: 12px; background: var(--superficie); }
+.tabela { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+.tabela th { position: sticky; top: 0; background: var(--primaria); color: #fff; font-family: 'Montserrat', sans-serif; font-weight: 700; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; text-align: left; padding: .7rem .9rem; white-space: nowrap; }
+.tabela td { padding: .65rem .9rem; border-top: 1px solid var(--borda); color: var(--texto); vertical-align: top; }
+.tabela tr:nth-child(even) td { background: #F7FAFA; }
+.tabela .cid { font-family: 'Montserrat', sans-serif; font-weight: 800; color: var(--secundaria); white-space: nowrap; }
+.vazio { padding: 1.2rem; color: var(--texto-suave); text-align: center; }
+.chips { margin-top: .6rem; }
+.chip { display: inline-block; background: #E8F4F3; color: var(--primaria); border-radius: 999px; padding: .2rem .7rem; font-size: .85rem; font-weight: 600; margin: .15rem .25rem .15rem 0; }
+
 /* ---------- Rodapé ---------- */
 .rodape {
     margin: 3rem var(--sangria) 0; padding: 2rem var(--sangria-pad); background: var(--primaria);
@@ -308,6 +353,23 @@ def selo(status: str) -> str:
     return f'<span class="selo" style="color:{cor}; background:{fundo}; border-color:{cor};">{status}</span>'
 
 
+class Bruto(str):
+    """Texto já seguro (HTML pronto) para uso em tabela_html."""
+
+
+def tabela_html(cabecalhos, linhas, vazio="Nenhum registro encontrado."):
+    """Tabela institucional. Os textos são escapados, exceto os marcados como Bruto."""
+    if not linhas:
+        return f'<div class="tabela-rolagem"><div class="vazio">{escape(vazio)}</div></div>'
+    cab = "".join(f"<th>{escape(c)}</th>" for c in cabecalhos)
+    corpo = "".join(
+        "<tr>" + "".join(f"<td>{c if isinstance(c, Bruto) else escape(str(c))}</td>" for c in linha) + "</tr>"
+        for linha in linhas
+    )
+    return (f'<div class="tabela-rolagem"><table class="tabela"><thead><tr>{cab}</tr></thead>'
+            f"<tbody>{corpo}</tbody></table></div>")
+
+
 def estilo_grafico(fig, altura=400):
     fig.update_layout(
         paper_bgcolor="rgba(0,0,0,0)",
@@ -319,6 +381,43 @@ def estilo_grafico(fig, altura=400):
     fig.update_xaxes(gridcolor="#E6EBF0", linecolor=TEMA["borda"])
     fig.update_yaxes(gridcolor="#E6EBF0", linecolor=TEMA["borda"])
     return fig
+
+
+def formulario_nova_comorbidade(chave: str, selecionar: bool = False, empilhado: bool = False):
+    """Formulário para a equipe médica cadastrar uma nova comorbidade (CID, doença e nome popular).
+
+    selecionar=True marca a nova comorbidade na lista do paciente. Nesse caso, chame-o
+    ANTES do campo de seleção de comorbidades, na mesma página.
+    empilhado=True coloca os campos um embaixo do outro (para colunas estreitas).
+    """
+    versao = st.session_state.get(f"_v_{chave}", 0)  # muda após cadastrar, para limpar os campos
+    base = f"{chave}_{versao}"
+    with st.form(base):
+        c1, c2, c3 = (st, st, st) if empilhado else st.columns([1, 2, 2])
+        cid = c1.text_input("CID-10", placeholder="Ex.: I10 ou E11.9", max_chars=8, key=f"{base}_cid")
+        nome = c2.text_input("Nome da doença", max_chars=cmb.TAM_MAX_TEXTO, key=f"{base}_nome")
+        popular = c3.text_input("Nome popular (opcional)", max_chars=cmb.TAM_MAX_TEXTO, key=f"{base}_pop")
+        enviar = st.form_submit_button("Cadastrar comorbidade")
+    if not enviar:
+        return
+    try:
+        nova = cmb.adicionar(cid, nome, popular)
+    except ValueError as erro:
+        st.error(str(erro))
+        return
+    except OSError:
+        st.error("Não foi possível gravar o cadastro. Verifique as permissões da pasta data/ e tente novamente.")
+        return
+    mensagem = f"Comorbidade {nova['cid']} cadastrada com sucesso."
+    if selecionar:
+        marcadas = list(st.session_state.get("comorb_sel", []))
+        if len(marcadas) < 10:
+            marcadas.append(cmb.rotulo(nova["cid"], nova["nome"], nova["nome_popular"]))
+            st.session_state["comorb_sel"] = marcadas
+            mensagem += " Ela já foi selecionada para este paciente."
+    st.session_state["aviso_comorb"] = mensagem
+    st.session_state[f"_v_{chave}"] = versao + 1
+    st.rerun()
 
 
 # ---------------------------------------------------------------------------
@@ -436,13 +535,23 @@ def colunas_leitos(df: pd.DataFrame):
 # ---------------------------------------------------------------------------
 # Cabeçalho e navegação
 # ---------------------------------------------------------------------------
-LOGO_SVG = (
-    '<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
-    '<path d="M18 4h12v14h14v12H30v14H18V30H4V18h14z" fill="#309B96"/>'
-    '<path d="M18 4h12v14h14v12H30v14H18V30H4V18h14z" fill="none" stroke="#1B4067" stroke-width="2" transform="translate(2 2) scale(.92)"/>'
-    "</svg>"
-)
+# ---------------------------------------------------------------------------
+# Cabeçalho e navegação
+# ---------------------------------------------------------------------------
+LOGO_PATH = BASE_DIR / "logo_unimar.png"
 
+if LOGO_PATH.exists():
+    import base64
+
+    with open(LOGO_PATH, "rb") as arquivo:
+        logo_base64 = base64.b64encode(arquivo.read()).decode("utf-8")
+
+    LOGO_HTML = (
+        f'<img src="data:image/png;base64,{logo_base64}" '
+        'alt="Logo Unimar">'
+    )
+else:
+    LOGO_HTML = ""
 # Permite que os atalhos da página inicial (links ?p=...) abram a página escolhida
 if "pagina" not in st.session_state:
     st.session_state["pagina"] = "inicio"
@@ -451,35 +560,17 @@ if _alvo in PAGINAS:
     st.session_state["pagina"] = _alvo
     st.query_params.clear()
 
-def _achar_logo():
-    """Procura a logo 'logo_unimar' na pasta do dashboard (aceita png, jpg, jpeg, webp)
-    e também o caso de extensão duplicada no Windows (logo_unimar.png.png)."""
-    for nome in ("logo_unimar.png", "logo_unimar.png.png", "logo_unimar.jpg",
-                 "logo_unimar.jpeg", "logo_unimar.webp"):
-        caminho = BASE_DIR / nome
-        if caminho.is_file():
-            return caminho
-    return BASE_DIR / "logo_unimar.png"
-
-
-LOGO_PATH = _achar_logo()
-
 with st.container(key="topo"):
     col_marca, col_nav = st.columns([1, 3], vertical_alignment="center")
+
     with col_marca:
-        if LOGO_PATH.is_file():
-            st.image(str(LOGO_PATH), width=190)
-        else:
-            html(
-                f"""
-                <div class="marca">{LOGO_SVG}
-                    <div class="marca-txt">
-                        <div class="marca-leg">{INSTITUICAO}</div>
-                        <div class="marca-nome">{NOME_SISTEMA}</div>
-                    </div>
-                </div>
-                """
-            )
+        html(
+            f"""
+            <div class="marca">
+                {LOGO_HTML}
+            </div>
+            """
+        )
     with col_nav:
         pagina = st.radio(
             "Navegação",
@@ -498,8 +589,9 @@ with st.container(key="topo"):
 if pagina == "inicio":
     ICO_LEITO = '<svg viewBox="0 0 48 48"><path d="M5 38V12M5 28h38v10M5 28v-4a4 4 0 0 1 4-4h12a8 8 0 0 1 8 8M13 20a3 3 0 1 0 0-.1"/></svg>'
     ICO_GRAF = '<svg viewBox="0 0 48 48"><path d="M7 7v34h34M14 32l8-9 6 5 12-14M33 14h7v7"/></svg>'
+    ICO_SETOR = '<svg viewBox="0 0 48 48"><path d="M6 42V10h20v32M26 42V20h16v22M4 42h40M12 18h4M12 26h4M12 34h4M32 28h4M32 36h4"/></svg>'
     ICO_ALTA = '<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="17"/><path d="M24 13v11l7 5"/></svg>'
-    ICO_DOC = '<svg viewBox="0 0 48 48"><path d="M12 5h17l9 9v29H12zM29 5v9h9M18 24h14M18 31h14"/></svg>'
+    ICO_COMORB = '<svg viewBox="0 0 48 48"><path d="M16 8h16v6H16zM12 11H9v32h30V11h-3M24 22v12M18 28h12"/></svg>'
     html(
         f"""
         <div class="hero"><div class="hero-grid">
@@ -516,8 +608,9 @@ if pagina == "inicio":
         <div class="atalhos">
             <a class="atalho" href="?p=leitos" target="_self">{ICO_LEITO}<span>Mapa de<br>Leitos</span></a>
             <a class="atalho" href="?p=painel" target="_self">{ICO_GRAF}<span>Painel<br>Gerencial</span></a>
+            <a class="atalho" href="?p=setores" target="_self">{ICO_SETOR}<span>Painel<br>por Setor</span></a>
             <a class="atalho" href="?p=alta" target="_self">{ICO_ALTA}<span>Previsão<br>de Alta</span></a>
-            <a class="atalho" href="?p=sobre" target="_self">{ICO_DOC}<span>Informações<br>Institucionais</span></a>
+            <a class="atalho" href="?p=comorb" target="_self">{ICO_COMORB}<span>Cadastro de<br>Comorbidades</span></a>
         </div>
         """
     )
@@ -528,7 +621,7 @@ if pagina == "inicio":
     k1.markdown(indicador(resumo["total_leitos"], "Total de leitos"), unsafe_allow_html=True)
     k2.markdown(indicador(resumo["livres"], "Leitos livres", COR_STATUS["Livre"]), unsafe_allow_html=True)
     k3.markdown(indicador(resumo["ocupados"], "Leitos ocupados", COR_STATUS["Ocupado"]), unsafe_allow_html=True)
-    k4.markdown(indicador(f"{resumo['taxa_ocupacao']}%", "Taxa de ocupação"), unsafe_allow_html=True)
+    k4.markdown(indicador(f"{stor.fmt(resumo['taxa_ocupacao'])}%", "Taxa de ocupação"), unsafe_allow_html=True)
 
     html(
         f"""
@@ -594,7 +687,7 @@ elif pagina == "painel":
     k1.metric("Total de leitos", resumo["total_leitos"])
     k2.metric("Leitos livres", resumo["livres"])
     k3.metric("Leitos ocupados", resumo["ocupados"])
-    k4.metric("Taxa de ocupação", f"{resumo['taxa_ocupacao']}%")
+    k4.metric("Taxa de ocupação", f"{stor.fmt(resumo['taxa_ocupacao'])}%")
 
     st.markdown("<br>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
@@ -618,6 +711,29 @@ elif pagina == "painel":
         fig2.update_layout(xaxis_title="", yaxis_title="Leitos ocupados")
         st.plotly_chart(estilo_grafico(fig2, 400), use_container_width=True)
 
+    st.markdown("### Ocupação por setor")
+    base_setores = stor.normalizar_leitos(df)
+    linhas_setor = []
+    for nome_setor in stor.PERFIS:
+        parte = base_setores[base_setores["setor"] == nome_setor]
+        if len(parte):
+            taxa = round((parte["status"] == "Ocupado").mean() * 100, 1)
+            linhas_setor.append({"Setor": nome_setor, "Ocupação (%)": taxa,
+                                 "Situação": stor.situacao(taxa, nome_setor)[0]})
+    if linhas_setor:
+        fig_s = px.bar(
+            pd.DataFrame(linhas_setor), x="Ocupação (%)", y="Setor", orientation="h", color="Situação",
+            text="Ocupação (%)",
+            color_discrete_map={"Normal": COR_STATUS["Livre"], "Atenção": COR_STATUS["Em higienização"],
+                                "Crítico": COR_STATUS["Ocupado"]},
+        )
+        fig_s.update_traces(textposition="outside")
+        fig_s.update_layout(xaxis=dict(range=[0, 105], title="Ocupação (%)"), yaxis_title="",
+                            legend=dict(orientation="h", y=1.15, title=""))
+        st.plotly_chart(estilo_grafico(fig_s, 320), use_container_width=True)
+        st.caption("A situação de cada setor segue os limites de referência definidos em dashboard/setores.py. "
+                   "Para o detalhamento, acesse a página Setores.")
+
     st.markdown("### Demanda nos últimos 30 dias")
     hist = gerar_historico()
     fig3 = go.Figure()
@@ -634,12 +750,167 @@ elif pagina == "painel":
     )
     st.plotly_chart(estilo_grafico(fig3, 400), use_container_width=True)
 
+# ----- PAINEL POR SETOR -----
+elif pagina == "setores":
+    titulo_pagina(
+        "Painel por Setor",
+        "Indicadores, alertas e projeções específicos de cada área assistencial do hospital.",
+    )
+
+    leitos_df = stor.normalizar_leitos(carregar_leitos())
+    historico = gerar_historico()
+    ref = stor.data_referencia(leitos_df, historico["Data"].max().date())
+
+    with st.container(key="seletor"):
+        setor_sel = st.radio(
+            "Setor", list(stor.PERFIS.keys()), horizontal=True,
+            label_visibility="collapsed", key="setor_sel",
+        )
+
+    perfil = stor.PERFIS[setor_sel]
+    dfs = leitos_df[leitos_df["setor"] == setor_sel]
+
+    if dfs.empty:
+        st.info(f"Não há leitos cadastrados no setor {setor_sel}.")
+    else:
+        m = stor.calcular(dfs, setor_sel, ref)
+        nivel, chave_cor, mensagem_sit = stor.situacao(m["ocupacao"], setor_sel)
+        cor_sit, fundo_sit = COR_STATUS[chave_cor], FUNDO_STATUS[chave_cor]
+        ocupados_df = m["_ocupados_df"]
+
+        html(
+            f"""
+            <div class="cartao cartao-destaque" style="margin-top:1.2rem;">
+                <h3>{escape(setor_sel)}</h3>
+                <p>{escape(perfil["descricao"])}</p>
+                <p><strong>Foco do acompanhamento:</strong> {escape(perfil["foco"])}.</p>
+            </div>
+            <div class="situacao" style="background:{fundo_sit}; border-color:{cor_sit};">
+                <span class="nivel" style="color:{cor_sit};">Situação: {nivel}</span>
+                <span class="msg">{escape(mensagem_sit)}</span>
+            </div>
+            """
+        )
+
+        for col, (rotulo_kpi, valor_kpi) in zip(st.columns(4), stor.kpis(setor_sel, m)):
+            col.markdown(indicador(valor_kpi, rotulo_kpi), unsafe_allow_html=True)
+
+        st.markdown("### Pontos de acompanhamento")
+        cartoes = []
+        for r in stor.regras(setor_sel, m):
+            cor_r = COR_STATUS["Livre"] if r["ok"] else COR_STATUS["Em higienização"]
+            texto_r = "Adequado" if r["ok"] else "Requer atenção"
+            cartoes.append(
+                f'<div class="regra" style="border-left-color:{cor_r};">'
+                f'<div class="t">{escape(r["titulo"])}</div>'
+                f'<div class="s" style="color:{cor_r};">{texto_r}</div>'
+                f'<div class="d">{escape(r["detalhe"])}</div></div>'
+            )
+        st.markdown('<div class="regras">' + "".join(cartoes) + "</div>", unsafe_allow_html=True)
+
+        g1, g2 = st.columns(2)
+        with g1:
+            st.markdown("### Situação dos leitos")
+            sc = dfs["status"].value_counts().reset_index()
+            sc.columns = ["Situação", "Quantidade"]
+            fig_a = px.pie(sc, names="Situação", values="Quantidade", color="Situação",
+                           color_discrete_map=COR_STATUS, hole=0.5)
+            fig_a.update_traces(textfont_size=14, textposition="inside")
+            fig_a.update_layout(legend=dict(orientation="h", y=-0.1))
+            st.plotly_chart(estilo_grafico(fig_a, 360), use_container_width=True, key=f"pizza_{setor_sel}")
+        with g2:
+            st.markdown("### Tempo de internação")
+            if ocupados_df.empty:
+                st.info("Não há pacientes internados neste setor.")
+            else:
+                maximo = int(ocupados_df["dias_internado"].max())
+                fig_b = px.histogram(ocupados_df, x="dias_internado", nbins=min(10, max(3, maximo)))
+                fig_b.update_traces(marker_color=TEMA["primaria"])
+                fig_b.add_vline(
+                    x=perfil["esperado"], line_dash="dash", line_color=COR_STATUS["Ocupado"],
+                    annotation_text=f"Esperado: {stor.fmt(perfil['esperado'])} dias",
+                    annotation_position="top right",
+                )
+                fig_b.update_layout(xaxis_title="Dias de internação", yaxis_title="Pacientes", bargap=0.1)
+                fig_b.update_yaxes(dtick=1, rangemode="tozero")
+                st.plotly_chart(estilo_grafico(fig_b, 360), use_container_width=True, key=f"hist_{setor_sel}")
+
+        st.markdown("### Altas previstas e disponibilidade nos próximos 7 dias")
+        proj = stor.projecao_altas(m, ref)
+        fig_c = go.Figure()
+        fig_c.add_trace(go.Bar(x=proj["data"], y=proj["altas"], name="Altas previstas",
+                               marker_color=TEMA["secundaria"]))
+        fig_c.add_trace(go.Scatter(x=proj["data"], y=proj["disponiveis"], mode="lines+markers",
+                                   name="Leitos disponíveis (acumulado)",
+                                   line=dict(color=TEMA["primaria"], width=3)))
+        fig_c.update_layout(yaxis_title="Leitos", legend=dict(orientation="h", y=1.15), hovermode="x unified")
+        st.plotly_chart(estilo_grafico(fig_c, 340), use_container_width=True, key=f"proj_{setor_sel}")
+        st.caption("Leitos disponíveis = livres + em higienização + altas previstas acumuladas. "
+                   "As altas em atraso são contadas no primeiro dia.")
+
+        t1, t2 = st.columns(2)
+        with t1:
+            st.markdown(f"### Permanência acima de {stor.fmt(perfil['esperado'])} dias")
+            acima = ocupados_df[ocupados_df["dias_internado"] > perfil["esperado"]].sort_values(
+                "dias_internado", ascending=False)
+            linhas_t1 = [
+                [r.codigo, f"{int(r.dias_internado)} dias",
+                 r.previsao_alta.strftime("%d/%m/%Y") if pd.notna(r.previsao_alta) else "—"]
+                for r in acima.itertuples()
+            ]
+            st.markdown(tabela_html(["Leito", "Internado há", "Alta prevista"], linhas_t1,
+                                    "Nenhum paciente acima da permanência esperada."), unsafe_allow_html=True)
+        with t2:
+            st.markdown("### Próximas altas")
+            proximas = ocupados_df.dropna(subset=["previsao_alta"]).sort_values("previsao_alta").head(8)
+            linhas_t2 = []
+            for r in proximas.itertuples():
+                if r.dias_ate_alta < 0:
+                    quando = "Em atraso"
+                elif r.dias_ate_alta == 0:
+                    quando = "Hoje"
+                else:
+                    quando = f"Em {int(r.dias_ate_alta)} dia(s)"
+                linhas_t2.append([r.codigo, r.previsao_alta.strftime("%d/%m/%Y"), quando])
+            st.markdown(tabela_html(["Leito", "Data prevista", "Quando"], linhas_t2,
+                                    "Nenhuma alta prevista."), unsafe_allow_html=True)
+
+        st.markdown(f"### Leitos do setor ({len(dfs)})")
+        cartoes_leito = []
+        for r in dfs.itertuples():
+            cor_l = COR_STATUS.get(r.status, TEMA["primaria"])
+            cartoes_leito.append(
+                f'<div class="leito" style="border-left-color:{cor_l};">'
+                f'<div class="cod">{escape(str(r.codigo))}</div>'
+                f'<div class="setor">{escape(setor_sel)}</div>{selo(r.status)}</div>'
+            )
+        st.markdown('<div class="grade">' + "".join(cartoes_leito) + "</div>", unsafe_allow_html=True)
+
+        st.caption("Parâmetros de referência do setor (permanência esperada e limites de ocupação) definidos em "
+                   "dashboard/setores.py. Ajuste-os conforme os protocolos do hospital.")
+        if ref != date.today():
+            st.caption(f"Os dados de demonstração foram gerados em {ref.strftime('%d/%m/%Y')}; "
+                       "as previsões de alta são contadas a partir dessa data.")
+
 # ----- PREVISÃO DE ALTA -----
 elif pagina == "alta":
     titulo_pagina(
         "Previsão de Alta",
         "Informe os dados do paciente para obter uma estimativa do tempo restante de internação.",
     )
+
+    catalogo = cmb.carregar()
+    rotulos = [cmb.rotulo(r.cid, r.nome, r.nome_popular) for r in catalogo.itertuples()]
+    dados_comorb = {rot: (r.cid, r.nome_popular) for rot, r in zip(rotulos, catalogo.itertuples())}
+    # remove da seleção qualquer item que não exista mais no catálogo
+    st.session_state["comorb_sel"] = [x for x in st.session_state.get("comorb_sel", []) if x in dados_comorb]
+
+    aviso = st.session_state.pop("aviso_comorb", None)
+    if aviso:
+        st.success(aviso)
+    with st.expander("A comorbidade do paciente não está na lista? Cadastre uma nova"):
+        st.caption("Informe o CID-10, o nome da doença e, se desejar, o nome popular.")
+        formulario_nova_comorbidade("nova_comorb_alta", selecionar=True)
 
     with st.form("form_alta"):
         st.markdown("### Dados do paciente")
@@ -662,12 +933,18 @@ elif pagina == "alta":
                     5: "5 — Muito grave",
                 }[x],
             )
-        comorb = st.number_input(
-            "Número de comorbidades", min_value=0, max_value=10, value=1, step=1
+        comorb_sel = st.multiselect(
+            "Comorbidades do paciente",
+            options=rotulos,
+            key="comorb_sel",
+            max_selections=10,
+            placeholder="Selecione uma ou mais comorbidades (opcional)",
+            help="Busque pelo CID, pelo nome da doença ou pelo nome popular. É possível selecionar até 10.",
         )
         submitted = st.form_submit_button("Calcular previsão")
 
     if submitted:
+        comorb = min(len(comorb_sel), 10)  # limite do modelo e da API
         payload = {
             "idade": int(idade),
             "dias_internado": int(dias_int),
@@ -717,23 +994,85 @@ elif pagina == "alta":
         texto_faixa = ""
         if faixa:
             texto_faixa = (
-                f"<p>Intervalo estimado: de <strong>{faixa[0]}</strong> a "
-                f"<strong>{faixa[1]}</strong> dias.</p>"
+                f"<p>Intervalo estimado: de <strong>{stor.fmt(faixa[0])}</strong> a "
+                f"<strong>{stor.fmt(faixa[1])}</strong> dias.</p>"
             )
+
+        if comorb:
+            etiquetas = "".join(
+                f'<span class="chip">{escape(dados_comorb[r][0])}'
+                + (f" · {escape(dados_comorb[r][1])}" if dados_comorb[r][1] else "")
+                + "</span>"
+                for r in comorb_sel
+            )
+            texto_comorb = (
+                f"<p><strong>Comorbidades informadas ({comorb}):</strong></p>"
+                f'<div class="chips">{etiquetas}</div>'
+                '<p class="aviso" style="margin-top:.4rem;">O modelo considera a quantidade de '
+                "comorbidades informadas.</p>"
+            )
+        else:
+            texto_comorb = "<p>Nenhuma comorbidade informada.</p>"
 
         html(
             f"""
             <div class="cartao resultado" style="border-top:5px solid {cor}; margin-top:1.2rem;">
                 <div class="rotulo">Tempo restante estimado</div>
-                <div class="grande">{dias} dias</div>
+                <div class="grande">{stor.fmt(dias)} dias</div>
                 <p>Data prevista para a alta: <strong>{data_p}</strong></p>
                 <p>{mensagem}</p>
                 {texto_faixa}
+                {texto_comorb}
                 <p class="aviso">Esta estimativa é apenas um instrumento de apoio ao planejamento.
                 A decisão sobre a alta é sempre de responsabilidade da equipe médica.</p>
             </div>
             """
         )
+
+# ----- COMORBIDADES -----
+elif pagina == "comorb":
+    titulo_pagina(
+        "Cadastro de Comorbidades",
+        "Consulte as comorbidades disponíveis no cadastro do paciente ou inclua uma nova, "
+        "informando o CID-10, o nome da doença e o nome popular.",
+    )
+
+    aviso = st.session_state.pop("aviso_comorb", None)
+    if aviso:
+        st.success(aviso)
+
+    catalogo = cmb.carregar()
+    col_lista, col_form = st.columns([1.7, 1])
+
+    with col_lista:
+        termo = st.text_input(
+            "Buscar comorbidade", placeholder="Digite o CID, o nome da doença ou o nome popular",
+            max_chars=60,
+        )
+        filtrado = cmb.buscar(catalogo, termo)
+        st.markdown(f"**{len(filtrado)}** de {len(catalogo)} comorbidade(s)")
+        linhas_c = [
+            [Bruto(f'<span class="cid">{escape(r.cid)}</span>'), r.nome, r.nome_popular or "—", r.origem]
+            for r in filtrado.itertuples()
+        ]
+        st.markdown(
+            tabela_html(["CID-10", "Doença", "Nome popular", "Origem"], linhas_c,
+                        "Nenhuma comorbidade encontrada para essa busca."),
+            unsafe_allow_html=True,
+        )
+
+    with col_form:
+        html(
+            """
+            <div class="cartao cartao-destaque" style="margin-top:1.6rem;">
+                <h3>Nova comorbidade</h3>
+                <p>Não encontrou a doença na lista? Cadastre-a aqui e ela ficará disponível
+                para todos os pacientes.</p>
+                <p class="aviso">Confira o código na tabela oficial da CID-10. Cada CID só pode ser cadastrado uma vez.</p>
+            </div>
+            """
+        )
+        formulario_nova_comorbidade("nova_comorb_pagina", empilhado=True)
 
 # ----- INSTITUCIONAL -----
 elif pagina == "sobre":
